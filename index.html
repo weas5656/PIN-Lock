@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PIN Lock ➜ BB</title>
+<style>
+  :root{
+    --bg: #0b1020;
+    --card: #111827;
+    --txt: #e5e7eb;
+    --muted: #9ca3af;
+    --accent: #22c55e;
+    --danger: #ef4444;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family: system-ui, Segoe UI, Roboto, 'Prompt', sans-serif;
+    color:var(--txt);
+    min-height:100svh; display:grid; place-items:center;
+    background:
+      radial-gradient(60% 60% at 70% 30%, #1b2a5a66, transparent 60%),
+      radial-gradient(60% 60% at 30% 70%, #0e7a6a66, transparent 60%),
+      linear-gradient(135deg, #0b1020, #0b1226 60%, #0a132a);
+    padding:16px;
+  }
+  .card{
+    width:min(420px, 92vw);
+    background:rgba(17,24,39,.85);
+    border:1px solid #1f2937;
+    border-radius:22px; padding:22px 20px 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    backdrop-filter: blur(10px);
+    transition: transform .4s ease, opacity .4s ease;
+  }
+  h1{ font-size:1.15rem; margin:4px 0 14px; color:#d1d5db; text-align:center }
+  .hint{ text-align:center; color:var(--muted); font-size:.95rem; margin-bottom:16px }
+  .pin-dots{
+    display:flex; justify-content:center; gap:10px; margin:12px 0 18px;
+  }
+  .pin-dot{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid #334155; background:transparent; transition: all .2s;
+  }
+  .pin-dot.filled{ background:#e5e7eb; border-color:#e5e7eb }
+  .pin-dot.error{ background:var(--danger); border-color:var(--danger) }
+  .keypad{
+    display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;
+    width:min(360px, 100%); margin:0 auto;
+  }
+  .key{
+    aspect-ratio:1 / 1; border-radius:20px;
+    background:#0b1220; border:1px solid #334155; color:#e5e7eb;
+    font-size:1.4rem; font-weight:700; cursor:pointer;
+    display:grid; place-items:center; user-select:none;
+    transition: transform .05s ease, background .15s ease, border-color .15s ease;
+  }
+  .key:active{ transform: scale(.97); background:#0d162a }
+  .key.alt{ font-weight:600; font-size:1rem; color:#cbd5e1 }
+  .key.accent{ background:#0f2120; border-color:#2dd4bf; color:#99f6e4 }
+  .row-spacer{ height:4px }
+  .actions{
+    display:flex; justify-content:center; gap:12px; margin-top:14px;
+  }
+  .btn{
+    padding:10px 14px; border-radius:14px; border:1px solid #334155;
+    background:#0b1220; color:#e5e7eb; cursor:pointer; font-weight:600;
+  }
+  .btn.primary{ background:var(--accent); border-color:transparent; color:#052e11 }
+  .wrap{ width:100%; max-width:520px }
+
+  /* Shake on error */
+  .shake { animation: shake .35s ease }
+  @keyframes shake {
+    10%, 90% { transform: translateX(-2px) }
+    20%, 80% { transform: translateX(4px) }
+    30%, 50%, 70% { transform: translateX(-6px) }
+    40%, 60% { transform: translateX(6px) }
+  }
+
+  /* Unlocked view */
+  .success{
+    text-align:center; padding:6px 8px 4px;
+  }
+  .badge{
+    display:inline-block; padding:6px 10px; border-radius:999px;
+    background:#052e11; color:#86efac; border:1px solid #14532d;
+    font-size:.9rem; margin-bottom:10px
+  }
+  .msg{
+    white-space:pre-wrap; text-align:left;
+    background:#030712; border:1px dashed #374151;
+    border-radius:16px; padding:14px; line-height:1.5; color:#e5e7eb;
+  }
+  .tiny{ font-size:.9rem; color:var(--muted); margin-top:12px }
+  .center{ text-align:center }
+  .hidden{ display:none !important }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Locked Card -->
+    <div class="card" id="lockCard" aria-live="polite">
+      <h1>🔒 ใส่ PIN 6 หลักเพื่อปลดล็อก</h1>
+      <p class="hint">รหัสมือถืออ้วนๆ</p>
+
+      <div class="pin-dots" id="dots" aria-label="PIN progress">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+
+      <div class="keypad" id="keypad" role="group" aria-label="keypad">
+        <!-- numbers 1..9 -->
+        <div class="key" data-key="1">1</div>
+        <div class="key" data-key="2">2</div>
+        <div class="key" data-key="3">3</div>
+        <div class="key" data-key="4">4</div>
+        <div class="key" data-key="5">5</div>
+        <div class="key" data-key="6">6</div>
+        <div class="key" data-key="7">7</div>
+        <div class="key" data-key="8">8</div>
+        <div class="key" data-key="9">9</div>
+
+        <!-- row spacer to keep layout pretty on small screens -->
+        <div class="row-spacer"></div>
+
+        <!-- 0, backspace, clear -->
+        <div class="key" data-key="0">0</div>
+        <div class="key alt" data-back="1">⌫</div>
+        <div class="key alt" data-clear="1">ลบหมด</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="unlockBtn">ปลดล็อก</button>
+      
+      </div>
+      <p class="center tiny" id="errorNote" aria-live="assertive"></p>
+    </div>
+
+    <!-- Unlocked Card -->
+    <div class="card hidden" id="msgCard">
+      <div class="success">
+        <div class="badge">ปลดล็อกสำเร็จ ✅</div>
+        <h1>กอดๆนะค้าบบ</h1>
+      </div>
+      <div class="msg" id="messageBox"></div>
+      <div class="actions">
+        <button class="btn" id="lockAgain">ล็อกอีกครั้ง</button>
+      </div>
+    
+    </div>
+  </div>
+
+<script>
+/** ========= CONFIG (แก้ตรงนี้ได้) ========= **/
+let PIN_CODE = "020346"; // ➜ กำหนดรหัส PIN 6 หลักที่ต้องการ
+let MOTIVATION_TEXT = `สู้ ๆ นะค้าบบ! ✨
+ตั้งใจทำงานนค้าบบ
+เค้าเป็นกำลังใจให้อ้วนนนะค้าบบ 💚`;
+
+/** ========= STATE ========= **/
+const lockCard = document.getElementById('lockCard');
+const msgCard  = document.getElementById('msgCard');
+const dotsWrap = document.getElementById('dots');
+const dots = Array.from(dotsWrap.querySelectorAll('.pin-dot'));
+const keypad = document.getElementById('keypad');
+const unlockBtn = document.getElementById('unlockBtn');
+const hintBtn = document.getElementById('hintBtn');
+const errorNote = document.getElementById('errorNote');
+const messageBox = document.getElementById('messageBox');
+const lockAgain = document.getElementById('lockAgain');
+
+let buffer = "";
+
+/** ========= HELPERS ========= **/
+function updateDots(error=false){
+  dots.forEach((d,i) => {
+    d.classList.toggle('filled', i < buffer.length);
+    d.classList.toggle('error', error && i < buffer.length);
+  });
+}
+function clearAll(shake=false){
+  buffer = "";
+  updateDots(false);
+  if (shake) {
+    lockCard.classList.remove('shake');
+    void lockCard.offsetWidth; // reflow
+    lockCard.classList.add('shake');
+  }
+}
+function setError(msg){
+  errorNote.textContent = msg || "";
+}
+function tryUnlock(){
+  if (buffer.length !== 6) {
+    setError("กรุณาใส่ PIN ให้ครบ 6 หลัก");
+    updateDots(true);
+    clearAll(true);
+    return;
+  }
+  if (buffer === PIN_CODE) {
+    // success
+    messageBox.textContent = MOTIVATION_TEXT;
+    lockCard.classList.add('hidden');
+    msgCard.classList.remove('hidden');
+    setError("");
+    clearAll(false);
+  } else {
+    setError("รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง");
+    updateDots(true);
+    clearAll(true);
+  }
+}
+
+/** ========= EVENTS ========= **/
+keypad.addEventListener('click', (e) => {
+  const el = e.target.closest('.key');
+  if (!el) return;
+  if (el.dataset.key) {
+    if (buffer.length < 6) {
+      buffer += el.dataset.key;
+      updateDots(false);
+      if (buffer.length === 6) tryUnlock();
+    }
+  } else if (el.dataset.back) {
+    buffer = buffer.slice(0, -1);
+    updateDots(false);
+  } else if (el.dataset.clear) {
+    clearAll(false);
+    setError("");
+  }
+});
+
+unlockBtn.addEventListener('click', tryUnlock);
+
+// ใส่จากคีย์บอร์ดได้ด้วย
+window.addEventListener('keydown', (e) => {
+  if (/^\d$/.test(e.key)) {
+    if (buffer.length < 6) {
+      buffer += e.key;
+      updateDots(false);
+      if (buffer.length === 6) tryUnlock();
+    }
+  } else if (e.key === 'Backspace') {
+    buffer = buffer.slice(0,-1);
+    updateDots(false);
+  } else if (e.key.toLowerCase() === 'enter') {
+    tryUnlock();
+  } else if (e.key.toLowerCase() === 'escape') {
+    clearAll(false);
+    setError("");
+  }
+});
+
+// ปุ่มตั้งค่า: เปลี่ยน PIN / ข้อความอย่างไว
+hintBtn.addEventListener('click', async () => {
+  const newPin = prompt("ตั้งค่า PIN 6 หลักใหม่:", PIN_CODE);
+  if (newPin === null) return;
+  if (!/^\d{6}$/.test(newPin)) {
+    alert("ต้องเป็นตัวเลข 6 หลักเท่านั้น");
+    return;
+  }
+  PIN_CODE = newPin;
+
+  const newMsg = prompt("แก้ข้อความให้กำลังใจ:", MOTIVATION_TEXT);
+  if (newMsg !== null) MOTIVATION_TEXT = newMsg;
+
+  alert("บันทึกการตั้งค่าเรียบร้อย ✅");
+});
+
+// ล็อกกลับ
+lockAgain.addEventListener('click', () => {
+  msgCard.classList.add('hidden');
+  lockCard.classList.remove('hidden');
+  clearAll(false);
+  setError("");
+});
+</script>
+</body>
+</html>
